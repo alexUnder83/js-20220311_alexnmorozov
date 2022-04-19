@@ -22,7 +22,8 @@ export default class SortableTable {
       this.loading = true;
 
       const data = await this.loadData(id, order, this.start, this.end);
-      this.update(data);
+      this.data = [];
+      this.addRows(data);
 
       this.loading = false;
     }
@@ -98,11 +99,11 @@ export default class SortableTable {
     this.subElements = this.getSubElements(element);
 
     const { from, to } = this.range;
-    this.setRange(from, to);
+    this.update(from, to);
     this.initEventListeners();
   }
 
-  async setRange(from, to) {
+  async update(from, to) {
     const {id, order} = this.sorted;
     const data = await this.loadData(id, order, this.start, this.end, from, to);
 
@@ -127,12 +128,6 @@ export default class SortableTable {
   }
 
   addRows(data) {
-    this.data = data;
-
-    this.subElements.body.innerHTML = this.getTableRows(data);
-  }
-
-  update(data) {
     const rows = document.createElement('div');
 
     this.data = [...this.data, ...data];

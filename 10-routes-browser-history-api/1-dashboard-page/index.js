@@ -14,48 +14,52 @@ export default class Page {
   };
 
   render() {
-    const from = new Date();
-    from.setDate(from.getDate() - 30);
-    const to = new Date();
-    this.rangePicker = this.createRangePicker(from, to);
-    this.ordersChart = this.createOrdersChart(from, to);
-    this.salesChart = this.renderSalesChart(from, to);
-    this.customersChart = this.renderCustomersChart(from, to);
-    this.sortableTable = this.renderSortableTable(from, to);
-
-    this.subElements = {
-      rangePicker: this.rangePicker.element,
-      ordersChart: this.ordersChart.element,
-      salesChart: this.salesChart.element,
-      customersChart: this.customersChart.element,
-      sortableTable: this.sortableTable.element
-    };
-
     const div = document.createElement('div');
     div.innerHTML = this.getTemplate();
     this.element = div.firstElementChild;
 
-    const topPanel = this.element.querySelector('.content__top-panel');
-    topPanel.append(this.subElements.rangePicker);
+    this.initComponents();
+    this.subElements = this.getSubElement();
 
-    const chartsContainer = this.element.querySelector('.dashboard__charts');
-    chartsContainer.append(this.subElements.ordersChart);
-    chartsContainer.append(this.subElements.salesChart);
-    chartsContainer.append(this.subElements.customersChart);
-
-    this.element.append(this.subElements.sortableTable);
+    this.renderComponents();
 
     this.subElements.rangePicker.addEventListener('date-select', this.onDateSelected);
 
     return this.element;
   }
+  initComponents() {
+    const to = new Date();
+    const from = new Date();
+    from.setMonth(to.getMonth() - 1);
+    this.components = {
+      rangePicker: this.createRangePicker(from, to),
+      ordersChart: this.createOrdersChart(from, to),
+      salesChart: this.renderSalesChart(from, to),
+      customersChart: this.renderCustomersChart(from, to),
+      sortableTable: this.renderSortableTable(from, to)
+    };
+  }
+  getSubElement() {
+    const result = {};
+    const elements = this.element.querySelectorAll('[data-element]');
+    for (const element of elements) {
+      result[element.dataset.element] = element;
+    }
+    return result;
+  }
+  renderComponents() {
+    for (const [name, component] of Object.entries(this.components)) {
+      this.subElements[name].append(component.element);
+    }
+  }
   async update(from, to) {
-    await Promise.all([
-      this.ordersChart.loadData(from, to),
-      this.salesChart.loadData(from, to),
-      this.customersChart.loadData(from, to),
-      this.sortableTable.setRange(from, to)
-    ]);
+    const promises = Object.values(this.components).reduce((total, component) => {
+      if (component.update) {
+        total.push(component.update(from, to));
+      }
+      return total;
+    }, []);
+    await Promise.all(promises);
   }
   createRangePicker(from, to) {
     return new RangePicker({ from, to });
@@ -101,7 +105,7 @@ export default class Page {
   renderSortableTable(from, to) {
     return new SortableTable(header, {
       isSortLocally: true,
-      url: `api/dashboard/bestsellers?from=${from}&to=${to}`,
+      url: 'api/dashboard/bestsellers',
       range: {
         from,
         to
@@ -110,13 +114,18 @@ export default class Page {
   }
   getTemplate() {
     return `
-      <div>
+      <div class="dashboard">
         <div class="content__top-panel">
           <h2 class="page-title">Панель управления</h2>
+          <div data-element="rangePicker"></div>
         </div>
         <div class="dashboard__charts">
+          <div data-element="ordersChart"></div>
+          <div data-element="salesChart"></div>
+          <div data-element="customersChart"></div>
         </div>
         <h3 class="block-title">Лидеры продаж</h3>
+        <div data-element="sortableTable"></div>
       </div>
     `;
   }
@@ -127,11 +136,9 @@ export default class Page {
     this.element = null;
   }
   destroy() {
-    this.rangePicker.destroy();
-    this.ordersChart.destroy();
-    this.salesChart.destroy();
-    this.customersChart.destroy();
-    this.sortableTable.destroy();
+    for (const component of Object.values(this.components)) {
+      component.destroy();
+    }
     this.remove();
   }
 }
